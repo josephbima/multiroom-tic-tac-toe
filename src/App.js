@@ -1,14 +1,19 @@
-import {Client} from 'boardgame.io/client';
+import {Client} from 'boardgame.io/client'
+import { Local } from 'boardgame.io/multiplayer'
 import {TicTacToe} from './Game'
 
 class TicTacToeClient{
-    constructor(rootElement){
-        this.client = Client({game: TicTacToe});
-        this.client.start();
+    constructor(rootElement, {playerID} = {}){
+        this.client = Client({
+            game: TicTacToe,
+            multiplayer: Local(),
+            playerID
+        });
+        this.client.start()
         this.rootElement = rootElement
         this.createBoard()
         this.attachListeners()
-        
+
         // Subscribe to a callback everytime the state of the game is changed
         this.client.subscribe(state => this.update(state))
     }
@@ -74,4 +79,9 @@ class TicTacToeClient{
 }
 
 const appElement = document.getElementById('app');
-const app = new TicTacToeClient(appElement);
+const playerIDs = ['0','1','2']
+const clients = playerIDs.map(playerID => {
+    const rootElement = document.createElement('div')
+    appElement.append(rootElement)
+    return new TicTacToeClient(rootElement, {playerID})
+})
