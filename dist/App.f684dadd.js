@@ -27538,6 +27538,7 @@ exports.TicTacToe = void 0;
 var _core = require("boardgame.io/core");
 
 const TicTacToe = {
+  name: 'tic-tac-toe',
   setup: () => ({
     cells: Array(9).fill(null)
   }),
@@ -27591,8 +27592,13 @@ function IsVictory(cells) {
 function IsDraw(cells) {
   return cells.filter(c => c === null).length === 0;
 }
-},{"boardgame.io/core":"node_modules/boardgame.io/dist/esm/core.js"}],"src/App.js":[function(require,module,exports) {
+},{"boardgame.io/core":"node_modules/boardgame.io/dist/esm/core.js"}],"src/TicTacToeClient.js":[function(require,module,exports) {
 "use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.TicTacToeClient = void 0;
 
 var _client = require("boardgame.io/client");
 
@@ -27603,10 +27609,14 @@ var _Game = require("./Game");
 class TicTacToeClient {
   constructor(rootElement, {
     playerID
-  } = {}) {
+  } = {}, match_ID) {
     this.client = (0, _client.Client)({
       game: _Game.TicTacToe,
-      multiplayer: (0, _multiplayer.Local)(),
+      matchID: match_ID,
+      //multiplayer: Local(),
+      multiplayer: (0, _multiplayer.SocketIO)({
+        server: 'localhost:8000'
+      }),
       playerID
     });
     this.client.start();
@@ -27641,8 +27651,8 @@ class TicTacToeClient {
     // This event handler will read the cell id from a cell’s
     // `data-id` attribute and make the `clickCell` move.
     const handleCellClick = event => {
-      const id = parseInt(event.target.dataset.id); // console.log(event.target.dataset)
-
+      const id = parseInt(event.target.dataset.id);
+      console.log(event.target.dataset);
       this.client.moves['clickCell'](id);
     }; // Attach the event listener to each of the board cells.
 
@@ -27654,6 +27664,7 @@ class TicTacToeClient {
   }
 
   update(state) {
+    if (state == null) return;
     console.log('state updated'); // Get all the board cells.
 
     const cells = this.rootElement.querySelectorAll('.cell'); // Update cells to display the values in game state.
@@ -27675,16 +27686,146 @@ class TicTacToeClient {
 
 }
 
-const appElement = document.getElementById('app');
-const playerIDs = ['0', '1', '2'];
-const clients = playerIDs.map(playerID => {
-  const rootElement = document.createElement('div');
-  appElement.append(rootElement);
-  return new TicTacToeClient(rootElement, {
-    playerID
-  });
+exports.TicTacToeClient = TicTacToeClient;
+},{"boardgame.io/client":"node_modules/boardgame.io/dist/esm/client.js","boardgame.io/multiplayer":"node_modules/boardgame.io/dist/esm/multiplayer.js","./Game":"src/Game.js"}],"src/Lobby.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
 });
-},{"boardgame.io/client":"node_modules/boardgame.io/dist/esm/client.js","boardgame.io/multiplayer":"node_modules/boardgame.io/dist/esm/multiplayer.js","./Game":"src/Game.js"}],"node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
+exports.GameLobby = void 0;
+
+var _client = require("boardgame.io/client");
+
+var _TicTacToeClient = require("./TicTacToeClient");
+
+class GameLobby {
+  constructor(addr) {
+    this.lobbyClient = new _client.LobbyClient({
+      server: addr
+    });
+  }
+
+  async getGames() {
+    let game_server = undefined;
+    await this.lobbyClient.listGames().then(data => {
+      game_server = data;
+    }); //console.log(game_server)
+
+    return game_server;
+  }
+
+  async createGame(gameName, numPlayer, numGames = 1) {
+    for (let i = 0; i <= numGames; i++) {
+      const {
+        matchID
+      } = await this.lobbyClient.createMatch(gameName, {
+        numPlayers: numPlayer
+      });
+    }
+  }
+
+  async displayGames() {
+    let games = await this.getGames();
+    games.map(game => {
+      const rootElement = document.createElement('div');
+      rootElement.setAttribute("id", game);
+      const p = document.createElement('p');
+      p.innerHTML = game;
+      rootElement.appendChild(p);
+      document.getElementById('games').append(rootElement);
+      this.displayMatches(game);
+    }); // const { matchID } = await this.lobbyClient.createMatch('tic-tac-toe', {
+    //     numPlayers: 2
+    // });       
+    //console.log('matches',  matches)
+  }
+
+  async getMatches(gameName) {
+    let matches = undefined;
+    await this.lobbyClient.listMatches(gameName).then(data => {
+      matches = data;
+    });
+    return matches;
+  }
+
+  async displayMatches(gameName) {
+    let matches = await this.getMatches(gameName);
+    console.log('Matches', matches.matches);
+    const gameElement = document.getElementById(gameName);
+    let ul = document.createElement('ul');
+    ul.setAttribute("id", gameName + '-matches');
+    gameElement.appendChild(ul);
+    matches.matches.map(match => {
+      let matchID = match.matchID;
+      let li = document.createElement('li');
+      let a = document.createElement('a');
+      a.innerHTML = 'Match ID: ' + matchID;
+      a.setAttribute("href", "/");
+      a.setAttribute("id", matchID);
+      li.appendChild(a); // Display board after click
+
+      this.splashScreen(li).then(async playerID => {
+        const {
+          playerCredentials
+        } = await this.lobbyClient.joinMatch(gameName, matchID, {
+          playerID: playerID,
+          playerName: playerID
+        });
+        console.log("Creds", playerCredentials);
+        console.log("matchID", matchID);
+        let client = new _TicTacToeClient.TicTacToeClient(li, {
+          playerID
+        }, matchID);
+      });
+      ul.appendChild(li);
+    });
+  }
+
+  splashScreen(rootElement) {
+    return new Promise(resolve => {
+      const createButton = playerID => {
+        const button = document.createElement('button');
+        button.textContent = 'Player ' + playerID;
+
+        button.onclick = () => {
+          resolve(playerID);
+        };
+
+        rootElement.append(button);
+      };
+
+      let playerIDs = ['0', '1'];
+      playerIDs.forEach(createButton);
+    });
+  }
+
+}
+
+exports.GameLobby = GameLobby;
+},{"boardgame.io/client":"node_modules/boardgame.io/dist/esm/client.js","./TicTacToeClient":"src/TicTacToeClient.js"}],"src/App.js":[function(require,module,exports) {
+"use strict";
+
+var _Lobby = require("./Lobby");
+
+var _TicTacToeClient = require("./TicTacToeClient");
+
+const appElement = document.getElementById('app'); // const playerIDs = ['0']
+// const clients = playerIDs.map(playerID => {
+//     const rootElement = document.createElement('div')
+//     appElement.append(rootElement)
+//     return new TicTacToeClient(rootElement, {playerID})
+// })
+
+let lobby = new _Lobby.GameLobby("http://localhost:8000");
+
+let createGame = async () => await lobby.createGame('tic-tac-toe', 2, 3);
+
+let disp = async () => await lobby.displayGames(); // createGame()
+
+
+disp();
+},{"./Lobby":"src/Lobby.js","./TicTacToeClient":"src/TicTacToeClient.js"}],"node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
 var OldModule = module.bundle.Module;
@@ -27712,7 +27853,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "58638" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "65398" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};

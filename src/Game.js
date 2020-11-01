@@ -1,6 +1,7 @@
 import {INVALID_MOVE} from 'boardgame.io/core';
 
 export const TicTacToe = {
+    name:'tic-tac-toe',
     setup:() => ({cells: Array(9).fill(null)}), // Initialize value of game state G
     // Limit turn because in TTT player can only have one turn
     turn:{
