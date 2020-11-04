@@ -1,10 +1,15 @@
 import { LobbyClient } from 'boardgame.io/client';
-import { TicTacToeClient } from './TicTacToeClient'
+import { TicTacToeClient } from './TicTacToeClient';
+import Router from './Router';
 
+const router = new Router({
+    mode: 'hash',
+    root: '/'
+});
 
-export class GameLobby{
+class GameLobby{
     constructor(addr){
-        this.lobbyClient = new LobbyClient({ server: addr });
+        this.lobbyClient = new LobbyClient({ server: addr });        
     }
 
     async getGames(){
@@ -62,26 +67,38 @@ export class GameLobby{
 
         matches.matches.map((match) => {
             let matchID = match.matchID
+            let url = gameName+'/'+matchID
+            
             let li = document.createElement('li')
             let a = document.createElement('a')
+
+            
+            // Display board after click
+            
+
+            router.add(url, () => {
+                console.log('eh')
+                const appElement = document.getElementById('app');
+                this.splashScreen(appElement).then(async player_ID => {
+                    const { playerCredentials } = await this.lobbyClient.joinMatch(
+                        gameName,
+                        matchID,
+                        {
+                          playerID: player_ID,
+                          playerName: player_ID,
+                        }
+                    );
+                    console.log("Creds", playerCredentials)
+                    console.log("matchID", matchID)
+                    return new TicTacToeClient(appElement, { player_ID }, matchID);
+                });
+
+            })
+           
             a.innerHTML = 'Match ID: '+ matchID
-            a.setAttribute("href", "/")
+            a.setAttribute("href", '#/'+url)
             a.setAttribute("id", matchID)
             li.appendChild(a)
-            // Display board after click
-            this.splashScreen(li).then(async playerID => {
-                const { playerCredentials } = await this.lobbyClient.joinMatch(
-                    gameName,
-                    matchID,
-                    {
-                      playerID: playerID,
-                      playerName: playerID,
-                    }
-                );
-                console.log("Creds", playerCredentials)
-                console.log("matchID", matchID)
-                let client = new TicTacToeClient(li, { playerID }, matchID);
-            });
             ul.appendChild(li)
         })
     }
@@ -99,3 +116,5 @@ export class GameLobby{
         })
     }
 }
+
+export default GameLobby;

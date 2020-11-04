@@ -1,5 +1,4 @@
-import { GameLobby } from './Lobby';
-import { TicTacToeClient } from './TicTacToeClient'
+import GameLobby from './Lobby';
 
 
 const appElement = document.getElementById('app');
@@ -21,4 +20,4 @@ let disp = async() => await lobby.displayGames();
 
 // createGame()
 
-disp();
+disp();  

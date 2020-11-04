@@ -58,7 +58,7 @@ export class TicTacToeClient{
     }
 
     update(state){
-        if(state == null) return
+        if(state === null) return
         console.log('state updated')
         // Get all the board cells.
         const cells = this.rootElement.querySelectorAll('.cell');
